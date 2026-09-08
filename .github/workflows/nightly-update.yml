@@ -1,0 +1,37 @@
+name: Actualizar venta diaria
+
+on:
+  schedule:
+    # 23:50 hora Montevideo (UTC-3) = 02:50 UTC del día siguiente
+    - cron: '50 2 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r scripts/requirements.txt
+
+      - name: Actualizar venta del día desde Gmail
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+        run: python scripts/nightly_update.py
+
+      - name: Commit y push si hubo cambios
+        run: |
+          git config user.name "objetivo-diario-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git diff --quiet --cached || git commit -m "Actualizar venta real $(date -u +%F)"
+          git push
